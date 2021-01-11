@@ -5,7 +5,7 @@ const BCRYPT_WORK_FACTOR = 12;
 
 const db = require("../db");
 
-const {NotFoundError} = require("../expressError");
+const {NotFoundError, BadRequestError} = require("../expressError");
 
 /** User of the site. */
 
@@ -20,14 +20,17 @@ class User {
     const hashedPassword = await bcrypt.hash(
       password, BCRYPT_WORK_FACTOR);
 
-    const result = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
+    try {
+      const result = await db.query(
+        `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
         VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
         RETURNING username, password, first_name, last_name, phone`,
-       [username, hashedPassword, first_name, last_name, phone]);
-    const user = result.rows[0];
-
-    return user;
+        [username, hashedPassword, first_name, last_name, phone]);
+      const user = result.rows[0];
+      return user;
+    } catch (err) {
+      throw new BadRequestError("User could not be created");
+    }
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
