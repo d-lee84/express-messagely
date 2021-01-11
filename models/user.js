@@ -97,17 +97,18 @@ class User {
    */
 
   static async messagesFrom(username) {
-    let { username, first_name, last_name, phone } = await User.get(username);
-
     const results = await db.query(
-      `SELECT id, body, sent_at, read_at
+      `SELECT id, to_username, body, sent_at, read_at
         FROM messages
-        WHERE to_username = $1`,
+        WHERE from_username = $1`,
       [username],
     );
     let messages = results.rows.forEach(val => {
+      let { username, first_name, last_name, phone } = await User.get(val.to_username);
       val.to_user = { username, first_name, last_name, phone };
+      delete val.to_username;
     });
+
     return messages;
   }
 
