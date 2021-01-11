@@ -21,17 +21,17 @@ class User {
       password, BCRYPT_WORK_FACTOR);
 
     try {
-      const result = await db.query(
+      var result = await db.query(
         `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
         VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
         RETURNING username, password, first_name, last_name, phone`,
         [username, hashedPassword, first_name, last_name, phone]);
+      } catch (err) {
+        throw new BadRequestError("User could not be created");
+      }
       const user = result.rows[0];
       return user;
-    } catch (err) {
-      throw new BadRequestError("User could not be created");
     }
-  }
 
   /** Authenticate: is username/password valid? Returns boolean. */
 
@@ -44,18 +44,21 @@ class User {
 
     // Maybe shouldn't give back too descriptive of an error
     // if(user === undefined) throw new NotFoundError("Username does not exist");
-    if(user === undefined) return false;
+    if (user === undefined) return false;
     
+    // *** forgetting await here is dangerous ***
     return await bcrypt.compare(password, user.password);
   }
 
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
+    // look for user first
     await db.query(
       `UPDATE users
         SET last_login_at = current_timestamp
        WHERE username = $1`, [username]);
+    // return something to indicate success or failure
   }
 
   /** All: basic info on all users:
@@ -65,6 +68,7 @@ class User {
     const result = await db.query(
       `SELECT username, first_name, last_name 
         FROM users`);
+    // order by something useful ******* 
     const users = result.rows;
     
     return users;
@@ -114,11 +118,19 @@ class User {
     );
     
     let messages = results.rows;
-
-    for(let val of messages) {
-      let { username, first_name, last_name, phone } = await User.get(val.to_username);
-      val.to_user = { username, first_name, last_name, phone };
-      delete val.to_username;
+    let toUserInfo = new Map();
+    
+    for (let msg of messages) {
+      let user;
+      if (toUserInfo.has(msg.to_username)) {
+        user = toUserInfo.get(msg.to_username);
+      } else {
+        let { username, first_name, last_name, phone } = await User.get(msg.to_username);
+        user = { username, first_name, last_name, phone };
+        toUserInfo.set(msg.to_username, user);
+      }
+      msg.to_user = user;
+      delete msg.to_username;
     }
 
     return messages;
@@ -144,11 +156,19 @@ class User {
     );
     
     let messages = results.rows;
+    let fromUserInfo = new Map();
 
-    for(let val of messages) {
-      let { username, first_name, last_name, phone } = await User.get(val.from_username);
-      val.from_user = { username, first_name, last_name, phone };
-      delete val.from_username;
+    for (let msg of messages) {
+      let user;
+      if (fromUserInfo.has(msg.from_username)) {
+        user = fromUserInfo.get(msg.from_username);
+      } else {
+        let { username, first_name, last_name, phone } = await User.get(msg.from_username);
+        user = { username, first_name, last_name, phone };
+        fromUserInfo.set(msg.from_username, user);
+      }
+        msg.from_user =  user;
+        delete msg.from_username;
     }
 
     return messages;
