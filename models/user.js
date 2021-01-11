@@ -21,10 +21,10 @@ class User {
       password, BCRYPT_WORK_FACTOR);
 
     const result = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone, join_at)
-        VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0))
+      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
+        VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
         RETURNING username, password, first_name, last_name, phone`,
-       [username, hashedPassword, first_name, last_name, phone, Date.now()]);
+       [username, hashedPassword, first_name, last_name, phone]);
     const user = result.rows[0];
 
     return user;
@@ -51,8 +51,8 @@ class User {
   static async updateLoginTimestamp(username) {
     await db.query(
       `UPDATE users
-        SET last_login_at = to_timestamp($1 / 1000.0)
-       WHERE username = $2`, [Date.now(), username]);
+        SET last_login_at = current_timestamp
+       WHERE username = $1`, [username]);
   }
 
   /** All: basic info on all users:
@@ -85,6 +85,9 @@ class User {
       [username]
     );
     let user = result.rows[0];
+
+    if (user === undefined) throw new NotFoundError("User could not be found");
+
     return user;
   }
 
@@ -97,17 +100,23 @@ class User {
    */
 
   static async messagesFrom(username) {
+    // Check to make sure that a specific user with this username exists
+    await User.get(username);
+
     const results = await db.query(
       `SELECT id, to_username, body, sent_at, read_at
         FROM messages
         WHERE from_username = $1`,
-      [username],
+      [username]
     );
-    let messages = results.rows.forEach(val => {
+    
+    let messages = results.rows;
+
+    for(let val of messages) {
       let { username, first_name, last_name, phone } = await User.get(val.to_username);
       val.to_user = { username, first_name, last_name, phone };
       delete val.to_username;
-    });
+    }
 
     return messages;
   }
@@ -121,6 +130,25 @@ class User {
    */
 
   static async messagesTo(username) {
+    // Check to make sure that a specific user with this username exists
+    await User.get(username);
+
+    const results = await db.query(
+      `SELECT id, from_username, body, sent_at, read_at
+        FROM messages
+        WHERE to_username = $1`,
+      [username]
+    );
+    
+    let messages = results.rows;
+
+    for(let val of messages) {
+      let { username, first_name, last_name, phone } = await User.get(val.from_username);
+      val.from_user = { username, first_name, last_name, phone };
+      delete val.from_username;
+    }
+
+    return messages;
   }
 }
 
