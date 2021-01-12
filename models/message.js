@@ -4,6 +4,7 @@
 
 const { NotFoundError } = require("../expressError");
 const db = require("../db");
+const { phone, client } = require("../config");
 
 /** Message on the site. */
 
@@ -22,7 +23,10 @@ class Message {
              VALUES
                ($1, $2, $3, current_timestamp)
              RETURNING id, from_username, to_username, body, sent_at`,
-        [from_username, to_username, body]);
+      [from_username, to_username, body]);
+    
+    
+    await Message._sendSms(to_username, from_username);
 
     return result.rows[0];
   }
@@ -93,6 +97,25 @@ class Message {
       sent_at: m.sent_at,
       read_at: m.read_at,
     };
+  }
+
+  static async _sendSms(to_username, from_username) {
+    const result = await db.query(
+      `SELECT phone, first_name
+        FROM users
+        WHERE username = $1`,
+      [to_username]
+    );
+    let user = result.rows[0];
+
+    client.messages
+      .create({
+        body: `Hi ${user.first_name}, 
+          you have a new message from ${from_username}.`,
+        from: phone,
+        to: user.phone,
+      })
+      .then(message => console.log(message.sid));
   }
 }
 
