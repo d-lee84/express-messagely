@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 const { SECRET_KEY } = require("../config");
 const { UnauthorizedError } = require("../expressError");
 
+const Message = require("../models/message");
+
 
 /** Middleware: Authenticate user. */
 
@@ -51,9 +53,28 @@ function ensureCorrectUser(req, res, next) {
   }
 }
 
+/** Middleware: Get the message using message 
+ *              id from the url parameter
+ *  - Checks that a valid id is given
+ *  - Finds the message infrormation and stores it into 
+ *    the res.locals object
+ */
+
+async function getMessage(req, res, next) {
+  try {
+    var id = Number(req.params.id);
+  } catch (err) {
+    throw new BadRequestError("Invalid message ID");
+  }
+
+  res.locals.message = await Message.get(id);
+  return next();
+}
+
 
 module.exports = {
   authenticateJWT,
   ensureLoggedIn,
   ensureCorrectUser,
+  getMessage
 };

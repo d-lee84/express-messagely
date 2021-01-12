@@ -8,16 +8,18 @@ const middleware = require("../middleware/auth");
 
 /** GET / - get list of users.
  *
- * => {users: [{username, first_name, last_name, phone}, ...]}
+ * => {users: [{username, first_name, last_name}, ...]}
  *
  **/
-router.get("/",
+router.get(
+  "/",
   middleware.authenticateJWT,
   middleware.ensureLoggedIn,
   async function (req, res, next) {
     const users = await User.all();
     return res.json({ users });
-});
+  }
+);
 
 
 /** GET /:username - get detail of users.
@@ -25,15 +27,17 @@ router.get("/",
  * => {user: {username, first_name, last_name, phone, join_at, last_login_at}}
  *
  **/
-router.get("/:username",
+router.get(
+  "/:username",
   middleware.authenticateJWT,
   middleware.ensureLoggedIn,
   middleware.ensureCorrectUser,
-  async function (req, res, nex) {
+  async function (req, res, next) {
     let username = req.params.username;
     const user = await User.get(username);
     return res.json({ user });
-  });
+  }
+);
 
 /** GET /:username/to - get messages to user
  *
@@ -44,7 +48,17 @@ router.get("/:username",
  *                 from_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
-
+router.get(
+  "/:username/to",
+  middleware.authenticateJWT,
+  middleware.ensureLoggedIn,
+  middleware.ensureCorrectUser,
+  async function (req, res, next) {
+    let username = req.params.username;
+    const messages = await User.messagesTo(username);
+    return res.json({ messages });
+  }
+);
 
 /** GET /:username/from - get messages from user
  *
@@ -55,5 +69,16 @@ router.get("/:username",
  *                 to_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
+router.get(
+  "/:username/from",
+  middleware.authenticateJWT,
+  middleware.ensureLoggedIn,
+  middleware.ensureCorrectUser,
+  async function (req, res, next) {
+    let username = req.params.username;
+    const messages = await User.messagesFrom(username);
+    return res.json({ messages });
+  }
+);
 
 module.exports = router;
