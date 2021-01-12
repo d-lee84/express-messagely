@@ -42,23 +42,29 @@ class User {
        [username]);
     const user = result.rows[0];
 
-    // Maybe shouldn't give back too descriptive of an error
-    // if(user === undefined) throw new NotFoundError("Username does not exist");
     if (user === undefined) return false;
     
     // *** forgetting await here is dangerous ***
-    return await bcrypt.compare(password, user.password);
+    return await bcrypt.compare(password, user.password) === true;
   }
 
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-    // look for user first
-    await db.query(
+    let results = await db.query(
       `UPDATE users
         SET last_login_at = current_timestamp
-       WHERE username = $1`, [username]);
-    // return something to indicate success or failure
+       WHERE username = $1
+       RETURNING username, last_login_at`, 
+       [username]);
+    
+    let status = results.rows[0];
+
+    if (status === undefined) {
+      return false;
+    }
+
+    return true;
   }
 
   /** All: basic info on all users:
@@ -67,8 +73,9 @@ class User {
   static async all() {
     const result = await db.query(
       `SELECT username, first_name, last_name 
-        FROM users`);
-    // order by something useful ******* 
+        FROM users
+        ORDER BY last_name DESC, first_name DESC
+        LIMIT 100`);
     const users = result.rows;
     
     return users;
@@ -107,33 +114,7 @@ class User {
    */
 
   static async messagesFrom(username) {
-    // Check to make sure that a specific user with this username exists
-    await User.get(username);
-
-    const results = await db.query(
-      `SELECT id, to_username, body, sent_at, read_at
-        FROM messages
-        WHERE from_username = $1`,
-      [username]
-    );
-    
-    let messages = results.rows;
-    let toUserInfo = new Map();
-    
-    for (let msg of messages) {
-      let user;
-      if (toUserInfo.has(msg.to_username)) {
-        user = toUserInfo.get(msg.to_username);
-      } else {
-        let { username, first_name, last_name, phone } = await User.get(msg.to_username);
-        user = { username, first_name, last_name, phone };
-        toUserInfo.set(msg.to_username, user);
-      }
-      msg.to_user = user;
-      delete msg.to_username;
-    }
-
-    return messages;
+    return await User._getMessages(username, "from");
   }
 
   /** Return messages to this user.
@@ -145,33 +126,46 @@ class User {
    */
 
   static async messagesTo(username) {
+    return await User._getMessages(username, "to");
+  }
+
+  /** Helper function that is flexible about whether the 
+   *  message is from or to the user. 
+   */
+
+  static async _getMessages(username, to_or_from) {
+    let currentKey = (to_or_from === "to") ? "to_username" : "from_username";
+    let otherKey = (to_or_from === "to") ? "from_username" : "to_username";
+
     // Check to make sure that a specific user with this username exists
     await User.get(username);
 
     const results = await db.query(
-      `SELECT id, from_username, body, sent_at, read_at
+      `SELECT id, ${otherKey}, body, sent_at, read_at
         FROM messages
-        WHERE to_username = $1`,
+        WHERE ${currentKey} = $1`,
       [username]
     );
-    
+
     let messages = results.rows;
-    let fromUserInfo = new Map();
+    let userInfo = new Map();
+    let userKey = (to_or_from === "to") ? "from_user" : "to_user";
 
     for (let msg of messages) {
       let user;
-      if (fromUserInfo.has(msg.from_username)) {
-        user = fromUserInfo.get(msg.from_username);
+      if (userInfo.has(msg[otherKey])) {
+        user = userInfo.get(msg[otherKey]);
       } else {
-        let { username, first_name, last_name, phone } = await User.get(msg.from_username);
+        let { username, first_name, last_name, phone } = await User.get(msg[otherKey]);
         user = { username, first_name, last_name, phone };
-        fromUserInfo.set(msg.from_username, user);
+        userInfo.set(msg[otherKey], user);
       }
-        msg.from_user =  user;
-        delete msg.from_username;
+        msg[userKey] =  user;
+        delete msg[otherKey];
     }
 
     return messages;
+
   }
 }
 

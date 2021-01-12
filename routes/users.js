@@ -30,8 +30,7 @@ router.get(
 router.get(
   "/:username",
   middleware.authenticateJWT,
-  middleware.ensureLoggedIn,
-  middleware.ensureCorrectUser,
+  middleware.ensureCorrectUser, // already ensures that someone is logged in
   async function (req, res, next) {
     let username = req.params.username;
     const user = await User.get(username);
@@ -51,7 +50,6 @@ router.get(
 router.get(
   "/:username/to",
   middleware.authenticateJWT,
-  middleware.ensureLoggedIn,
   middleware.ensureCorrectUser,
   async function (req, res, next) {
     let username = req.params.username;
@@ -72,7 +70,6 @@ router.get(
 router.get(
   "/:username/from",
   middleware.authenticateJWT,
-  middleware.ensureLoggedIn,
   middleware.ensureCorrectUser,
   async function (req, res, next) {
     let username = req.params.username;

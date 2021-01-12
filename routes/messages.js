@@ -6,7 +6,7 @@ const router = new Router();
 const Message = require("../models/message");
 const middleware = require("../middleware/auth");
 
-const {BadRequestError, UnauthorizedError} = require("../expressError");
+const {UnauthorizedError} = require("../expressError");
 
 /** GET /:id - get detail of message.
  *
@@ -77,17 +77,18 @@ router.post(
   middleware.getMessage,
   async function (req, res, next) {
     let message = res.locals.message;
+    let id = req.body.id;
 
-    let username = res.locals.user.username;
+    let currUsername = res.locals.user.username;
 
-    // Check whether the user is the sender or recipient of the message 
-    let isRecipient = message.to_user.username === username;
+    // Check whether the user is the recipient of the message 
+    let isRecipient = (message.to_user.username === currUsername);
 
     if (!isRecipient) {
       throw new UnauthorizedError("You are unauthorized from viewing this");
     }
 
-    message = Message.markRead(id);
+    message = await Message.markRead(id);
 
     return res.json({ message });
   }
