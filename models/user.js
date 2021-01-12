@@ -195,8 +195,6 @@ class User {
     let encryptedResetCode = await bcrypt.hash(resetCode, BCRYPT_WORK_FACTOR);
     let currentTime = Date.now();
 
-    console.log("Before updating database");
-
     results = await db.query(
       `UPDATE users
         SET reset_code = $1,
@@ -205,8 +203,6 @@ class User {
        RETURNING username, reset_code`, 
        [encryptedResetCode, currentTime, user.username]);
 
-    console.log("After updating database");
-    
     if (results.rows[0] === undefined) {
       return null;
     }
@@ -251,7 +247,7 @@ class User {
     
     let isCorrectResetCode = 
       (await bcrypt.compare(reset_code, user.reset_code) === true);
-    let isUnder30Min = (Number(user.reset_req) + 1800000 > Date.now())
+    let isUnder30Min = (Number(user.reset_req) + 1800000 > Date.now());
     
     // Wrong code or been more than 30 min
     if (!isCorrectResetCode || !isUnder30Min) {

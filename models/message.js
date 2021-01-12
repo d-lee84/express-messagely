@@ -108,14 +108,14 @@ class Message {
     );
     let user = result.rows[0];
 
-    client.messages
+    await client
+      .messages
       .create({
         body: `Hi ${user.first_name}, 
           you have a new message from ${from_username}.`,
         from: TWILIO_FROM_PHONE,
         to: user.phone,
-      })
-      .then(message => console.log(message.sid));
+      });
   }
 }
 
