@@ -246,7 +246,7 @@ class User {
 
     let user = results.rows[0];
 
-    // If no user has this username, return null
+    // If no user has this username, return NotFoundError (non descriptive)
     if (user === undefined) throw new NotFoundError();
     
     let isCorrectResetCode = 
