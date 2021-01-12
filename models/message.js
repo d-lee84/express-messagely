@@ -4,7 +4,7 @@
 
 const { NotFoundError } = require("../expressError");
 const db = require("../db");
-const { phone, client } = require("../config");
+const { TWILIO_FROM_PHONE, client } = require("../config");
 
 /** Message on the site. */
 
@@ -112,7 +112,7 @@ class Message {
       .create({
         body: `Hi ${user.first_name}, 
           you have a new message from ${from_username}.`,
-        from: phone,
+        from: TWILIO_FROM_PHONE,
         to: user.phone,
       })
       .then(message => console.log(message.sid));

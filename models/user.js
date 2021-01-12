@@ -5,6 +5,10 @@ const BCRYPT_WORK_FACTOR = 12;
 
 const db = require("../db");
 
+const randomize = require('randomatic');
+
+const { TWILIO_FROM_PHONE, client } = require("../config");
+
 const {NotFoundError, BadRequestError} = require("../expressError");
 
 /** User of the site. */
@@ -166,6 +170,106 @@ class User {
 
     return messages;
 
+  }
+
+  /** Generate a reset code and update the corresponding columns 
+   *  in the database
+   * 
+   *  takes in a username (string)
+   *  returns {resetCode, phone}
+   */
+  static async getResetCode(username) {
+    let results = await db.query(
+      `SELECT username, phone
+        FROM users
+        WHERE username = $1`,
+      [username]
+    );
+
+    let user = results.rows[0];
+
+    // If no user has this username, return null
+    if (user === undefined) return null;
+
+    let resetCode = randomize('A0', 6);
+    let encryptedResetCode = await bcrypt.hash(resetCode, BCRYPT_WORK_FACTOR);
+    let currentTime = Date.now();
+
+    console.log("Before updating database");
+
+    results = await db.query(
+      `UPDATE users
+        SET reset_code = $1,
+            reset_req = $2
+       WHERE username = $3
+       RETURNING username, reset_code`, 
+       [encryptedResetCode, currentTime, user.username]);
+
+    console.log("After updating database");
+    
+    if (results.rows[0] === undefined) {
+      return null;
+    }
+
+    return {resetCode, phone: user.phone};
+  }
+
+  /** Send a SMS with the resetCode to the corresponding phone number */
+
+  static async sendResetSMS(resetObj) {
+    if(resetObj === null) return "Message failed!";
+
+    const {resetCode, phone} = resetObj;
+
+    client.messages
+      .create({
+        body: `Here is your reset code: ${resetCode},
+        You have 30 minutes to change your password!.`,
+        from: TWILIO_FROM_PHONE,
+        to: phone,
+      })
+      .then(message => console.log(message.sid));
+
+    return "Message has been sent!"
+  }
+
+  /** Reset the password for the user
+   */
+
+  static async resetPassword({username, reset_code, password}) {
+    let results = await db.query(
+      `SELECT reset_code, reset_req
+        FROM users
+        WHERE username = $1`,
+      [username]
+    );
+
+    let user = results.rows[0];
+
+    // If no user has this username, return null
+    if (user === undefined) throw new NotFoundError();
+    
+    let isCorrectResetCode = 
+      (await bcrypt.compare(reset_code, user.reset_code) === true);
+    let isUnder30Min = (Number(user.reset_req) + 1800000 > Date.now())
+    
+    // Wrong code or been more than 30 min
+    if (!isCorrectResetCode || !isUnder30Min) {
+      throw new BadRequestError();
+    }
+
+    let encryptedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
+
+    results = await db.query(
+      `UPDATE users
+        SET password = $1,
+            reset_code = '',
+            reset_req = ''
+       WHERE username = $2
+       RETURNING username`, 
+       [encryptedPassword, username]);
+
+    return "Password has been reset!"
   }
 }
 

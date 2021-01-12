@@ -13,7 +13,9 @@ CREATE TABLE users (
   last_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   join_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  last_login_at TIMESTAMP WITH TIME ZONE);
+  last_login_at TIMESTAMP WITH TIME ZONE,
+  reset_code TEXT,
+  reset_req TEXT);
 
  INSERT INTO users (
    username, 

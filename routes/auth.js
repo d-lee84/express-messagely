@@ -33,4 +33,34 @@ router.post("/register", async function (req, res, next) {
   return res.json({ token });
 });
 
+
+/** GET /reset: Inputs the username number to be able to reset password
+ *
+ * {username} => {message: "Text message sent!"}.
+ */
+router.get("/reset", async function (req, res, next) {
+  let username = req.body.username;
+  // resetInfoObj = {resetCode, phone}
+  let resetInfoObj = await User.getResetCode(username);
+
+  let message = await User.sendResetSMS(resetInfoObj);
+
+  return res.json({ message });
+});
+
+/** POST /reset: Takes in reset_code, username, new password
+ *  updates the database then return a response
+ *  - Error if its been more than 30 minutes or
+ *    if the reset_code is incorrect
+ *
+ * {username, reset_code, password} => {message: "Password has been reset!"}.
+ */
+router.post("/reset", async function (req, res, next) {
+  const {username, reset_code, password} = req.body;
+
+  let message = await User.resetPassword({username, reset_code, password});
+
+  return res.json({ message });
+});
+
 module.exports = router;
